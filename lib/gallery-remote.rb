@@ -54,8 +54,28 @@ class GalleryRemote
     send_request :cmd=>'login', :uname=>'carl', :password=>'yootgo'
   end
 
-  def albums
-    send_request :cmd=>'fetch-albums'
+  def albums(&block)
+    result_hash = send_request :cmd=>'fetch-albums'
+    album_numbers = result_hash.keys.map do |key| 
+      m = key.match(/\.(\d+)$/)
+      m ? m[1].to_i : 0
+    end   
+    albums = []
+    1.upto(album_numbers.max) do |i|
+      params = result_hash.keys.inject({}) do |hash, value|
+        m = value.match(/album\.(.*)\.#{i}/)
+        if m
+          hash[m[1]] = result_hash[value]
+        end
+        hash
+      end
+      album = Album.new(params)
+      if block
+        yield album
+      end
+      albums << album
+    end
+    albums
   end
   
   def status
@@ -111,5 +131,22 @@ class GalleryRemote
     end
     str << "g2_authToken=#{@auth_token}" if @auth_token
     str.join "&"
+  end
+end
+
+class Album
+  def initialize(hash)
+    @name=hash["name"]
+    @title=hash["title"]
+    @parent=hash["parent"]
+    @extra_fields=hash["info.extrafields"]
+    @delete=hash["perms.del_alb"] == "true"
+    @write=hash["perms.write"] == "true"
+    @add=hash["perms.add"] == "true"
+    @create_sub=hash["perms.create_sub"] == "true"
+  end
+  
+  def to_s
+    "Album #{@name}: #{@title} (#{@delete ? 'delete':''} #{@write ? 'write':''} #{@add ? 'add':''} #{@create_sub ? 'createsub':''})"
   end
 end

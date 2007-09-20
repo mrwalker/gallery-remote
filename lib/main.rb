@@ -12,7 +12,6 @@ rslt = r.login "carl", "yootgo"
 puts r.status
 #puts rslt.inspect
 
-rslt = r.albums
-puts r.status
-
-puts rslt.inspect
+r.albums do |album|
+  puts album
+end
