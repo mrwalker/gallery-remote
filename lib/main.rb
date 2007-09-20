@@ -8,10 +8,11 @@
 require 'gallery-remote'
 
 r = GalleryRemote.new "http://www.leibys-place.com/gallery/main.php"
-rslt = r.login "carl", "yootgo"
+r.login "test_acct", "test"
 puts r.status
-#puts rslt.inspect
 
-r.albums do |album|
+rslt = r.albums do |album|
   puts album
 end
+
+puts rslt.inspect

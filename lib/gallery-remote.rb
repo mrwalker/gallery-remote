@@ -51,7 +51,7 @@ class GalleryRemote
   end
 
   def login(user, pass)
-    send_request :cmd=>'login', :uname=>'carl', :password=>'yootgo'
+    send_request :cmd=>'login', :uname=>user, :password=>pass
   end
 
   def albums(&block)
@@ -136,17 +136,42 @@ end
 
 class Album
   def initialize(hash)
-    @name=hash["name"]
-    @title=hash["title"]
-    @parent=hash["parent"]
-    @extra_fields=hash["info.extrafields"]
-    @delete=hash["perms.del_alb"] == "true"
-    @write=hash["perms.write"] == "true"
-    @add=hash["perms.add"] == "true"
-    @create_sub=hash["perms.create_sub"] == "true"
+    @params = hash
+  end
+  
+  def name
+    @params["name"]
+  end
+  
+  def title
+    @params["title"]
+  end
+  
+  def parent
+    @params["parent"]
+  end
+  
+  def extra_fields
+    @params["info.extrafields"]
+  end
+  
+  def delete_permission
+    @params["perms.del_alb"] == "true"
+  end
+  
+  def write_permission
+    @params["perms.write"] == "true"
+  end
+  
+  def add_permission
+    @params["perms.add"] == "true"
+  end
+  
+  def create_subalbum_permission
+    @params["perms.create_sub"] == "true"
   end
   
   def to_s
-    "Album #{@name}: #{@title} (#{@delete ? 'delete':''} #{@write ? 'write':''} #{@add ? 'add':''} #{@create_sub ? 'createsub':''})"
+    "Album #{name}: #{title} (#{delete_permission ? 'delete':''} #{write_permission ? 'write':''} #{add_permission ? 'add':''} #{create_subalbum_permission ? 'createsub':''})"
   end
 end
