@@ -29,4 +29,10 @@ class CookieJarTest < Test::Unit::TestCase
     cookie_jar.add(nil)
     assert_nil cookie_jar.cookies
   end
+  
+  def test_expired
+    cookie_jar = CookieJar.new
+    cookie_jar.add(["COOKIE_ID=SDFW234GAE234SERG; expires=Sun, 13-Sep-1950 18:31:46 GMT"])
+    assert_nil cookie_jar.cookies    
+  end
 end

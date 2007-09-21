@@ -30,7 +30,6 @@ test6:
 test7:
     set-cookie:
         - NSC_xfc=0a0104240050;expires=Fri,14-Sep-07 19:31:51 GMT;path=/
-    result: NSC_xfc=0a0104240050
 test8:
     set-cookie:
         - _twitter_session=c4ca70b6523a522095ee436f38b7d58f; domain=.twitter.com; path=/
