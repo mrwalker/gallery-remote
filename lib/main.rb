@@ -11,8 +11,8 @@ r = GalleryRemote.new "http://www.leibys-place.com/gallery/main.php"
 r.login "test_acct", "test"
 puts r.status
 
-rslt = r.albums do |album|
+r.albums(:cmd=>'fetch-albums-prune', :no_perms=>"y") do |album|
   puts album
 end
 
-puts rslt.inspect
+#puts r.last_response.keys.join("\n")

@@ -3,6 +3,8 @@
 # 
 # Created on Sep 16, 2007, 4:16:42 PM
 # 
+# http://codex.gallery2.org/Gallery_Remote:Protocol
+# 
 require 'net/http'
 require 'cookie_jar'
 
@@ -51,21 +53,20 @@ class GalleryRemote
   end
 
   def login(user, pass)
-    send_request :cmd=>'login', :uname=>user, :password=>pass
+    @last_response = send_request :cmd=>'login', :uname=>user, :password=>pass
   end
 
-  def albums(&block)
-    result_hash = send_request :cmd=>'fetch-albums'
-    album_numbers = result_hash.keys.map do |key| 
-      m = key.match(/\.(\d+)$/)
-      m ? m[1].to_i : 0
-    end   
+  #  r.albums(:no_perms=>"no") { |album| puts album }
+  #  r.albums { |album| puts album }
+  #  albums = r.albums(:cmd=>'fetch-albums-prune', :no_perms=>"y")
+  def albums(parameters={}, &block)
+    @last_response = send_request({:cmd=>'fetch-albums'}.merge(parameters)) 
     albums = []
-    1.upto(album_numbers.max) do |i|
-      params = result_hash.keys.inject({}) do |hash, value|
+    1.upto(@last_response['album_count'].to_i) do |i|
+      params = @last_response.keys.inject({}) do |hash, value|
         m = value.match(/album\.(.*)\.#{i}/)
         if m
-          hash[m[1]] = result_hash[value]
+          hash[m[1]] = @last_response[value]
         end
         hash
       end
@@ -82,12 +83,16 @@ class GalleryRemote
     "#{@status} - (#{@status_text})"
   end
   
+  def last_response
+    @last_response
+  end
+  
   private
 
   def send_request(params)
     result_hash = {}
-    puts prep_params(params)
-    req = Net::HTTP::Get.new "#{@uri.path}?#{prep_params params}", header
+    req = Net::HTTP::Post.new "#{@uri.path}", header
+    req.set_form_data(prep_params(params))
     res = Net::HTTP.new(@uri.host, @uri.port).start { |http| http.request(req) }
     case res
     when Net::HTTPSuccess, Net::HTTPRedirection
@@ -122,15 +127,13 @@ class GalleryRemote
   end
   
   def prep_params(params)
-    str = []
-    @base_params.each_pair do |name, value|
-      str << "#{name}=#{value}"
-    end
+    result = {}
+    result = result.merge(@base_params)
     params.each_pair do |name, value|
-      str << "g2_form[#{name}]=#{value}"
+      result["g2_form[#{name}]"] = value
     end
-    str << "g2_authToken=#{@auth_token}" if @auth_token
-    str.join "&"
+    params["g2_authToken"] = @auth_token if @auth_token
+    result
   end
 end
 
