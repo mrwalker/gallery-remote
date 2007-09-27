@@ -5,6 +5,7 @@
 # 
 # http://codex.gallery2.org/Gallery_Remote:Protocol
 # 
+require 'cgi'
 require 'net/http'
 require 'cookie_jar'
 
@@ -49,7 +50,8 @@ class GalleryRemote
   def initialize(url)
     @uri = URI.parse(url)
     @base_params = { 'g2_controller'=>'remote:GalleryRemote', 'g2_form[protocol_version]'=>'2.9' }
-    @cookie_jar = CookieJar.new
+    @cookie_jar = CookieJar.new    
+    @boundary = "7d21f123d00c4"
   end
 
   def login(user, pass)
@@ -88,28 +90,55 @@ class GalleryRemote
   end
   
   private
-
-  def send_request(params)
-    result_hash = {}
-    req = Net::HTTP::Post.new "#{@uri.path}", header
-    req.set_form_data(prep_params(params))
-    res = Net::HTTP.new(@uri.host, @uri.port).start { |http| http.request(req) }
+  
+  def build_multipart_query(params, file_name)
+    params["g2_form[userfile_name]"] = file_name
+    result = params.map{ |k, v| "Content-Disposition: form-data; name=\"#{CGI::escape(k)}\"\r\n\r\n#{v}\r\n" }
+    content = open( file_name ) { |f|
+      f.read
+    }
+    result << "Content-Disposition: form-data; name=\"userfile\"; filename=\"#{file_name}\"\r\n" +
+      "Content-Transfer-Encoding: binary\r\n" +
+      "Content-Type: #{Web::Mime.get_mime_type(file_name)}\r\n\r\n" + 
+      content + "\r\n"
+    result.collect { |p| "--#{@boundary}\r\n#{p}" }.join("") + "--#{@boundary}--"
+  end
+  
+  def build_query(params)
+    params.map{ |k, v| "#{k}=#{v}" }.join("&") 
+  end
+  
+  def send_request(params, file_name=nil)
+    post_parameters = prep_params(params)
+    if(file_name)
+      query = build_multipart_query(post_parameters, file_name)
+      res = post(query, @boundary)
+    else
+      query = build_query(post_parameters)
+      res = post(query)
+    end
     case res
     when Net::HTTPSuccess, Net::HTTPRedirection
       read_cookies res.header
-      result_hash = read_properties res.body
+      set_results(read_properties(res.body))
     else
       res.error!
     end
-    @auth_token = result_hash['auth_token']
-    @status = result_hash['status']
-    @status_text = result_hash['status_text']
-    result_hash
   end
 
-  def header
-    result = {}    
-    result["Cookie"] = @cookie_jar.cookies if @cookie_jar.cookies
+  def post( query, boundary=nil )
+    headers = {}    
+    headers["Cookie"] = @cookie_jar.cookies if @cookie_jar.cookies
+    headers["Content-type"] = "multipart/form-data, boundary=#{boundary} " if boundary
+    Net::HTTP.start(@uri.host, @uri.port) { |h|
+      h.post( @uri.path, query, headers )
+    }
+  end
+
+  def set_results(result)
+    @auth_token = result['auth_token']
+    @status = result['status']
+    @status_text = result['status_text']
     result
   end
   

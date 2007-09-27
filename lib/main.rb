@@ -5,7 +5,7 @@
 # 
 # To change this template, choose Tools | Templates
 # and open the template in the editor.
-require 'gallery-remote'
+require 'gallery_remote'
 
 r = GalleryRemote.new "http://www.leibys-place.com/gallery/main.php"
 r.login "test_acct", "test"
