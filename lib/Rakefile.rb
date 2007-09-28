@@ -11,3 +11,7 @@ require 'rake'
 require 'rake/testtask'
 require 'rake/rdoctask'
 
+task :test do 
+  require 'rake/runtest'
+  Rake.run_tests '../**/test*.rb'
+end

@@ -110,13 +110,15 @@ class GalleryRemote
   
   def send_request(params, file_name=nil)
     post_parameters = prep_params(params)
+    headers = {}    
+    headers["Cookie"] = @cookie_jar.cookies if @cookie_jar.cookies
     if(file_name)
       query = build_multipart_query(post_parameters, file_name)
-      res = post(query, @boundary)
+	  headers["Content-type"] = "multipart/form-data, boundary=#{boundary} " if boundary
     else
       query = build_query(post_parameters)
-      res = post(query)
     end
+    res = post(query, headers)
     case res
     when Net::HTTPSuccess, Net::HTTPRedirection
       read_cookies res.header
@@ -126,10 +128,7 @@ class GalleryRemote
     end
   end
 
-  def post( query, boundary=nil )
-    headers = {}    
-    headers["Cookie"] = @cookie_jar.cookies if @cookie_jar.cookies
-    headers["Content-type"] = "multipart/form-data, boundary=#{boundary} " if boundary
+  def post( query, headers={} )
     Net::HTTP.start(@uri.host, @uri.port) { |h|
       h.post( @uri.path, query, headers )
     }
