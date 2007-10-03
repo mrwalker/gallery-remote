@@ -10,6 +10,7 @@ require 'net/http'
 require 'cookie_jar'
 
 class GalleryRemote
+	@@supported_types = { ".jpg"=>"image/jpeg" }
   GR_STAT_SUCCESS=0
   PROTO_MAJ_VER_INVAL=101
   PROTO_MIN_VER_INVAL=102
@@ -55,14 +56,14 @@ class GalleryRemote
   end
 
   def login(user, pass)
-    @last_response = send_request :cmd=>'login', :uname=>user, :password=>pass
+    send_request :cmd=>'login', :uname=>user, :password=>pass
   end
 
   #  r.albums(:no_perms=>"no") { |album| puts album }
   #  r.albums { |album| puts album }
   #  albums = r.albums(:cmd=>'fetch-albums-prune', :no_perms=>"y")
   def albums(parameters={}, &block)
-    @last_response = send_request({:cmd=>'fetch-albums'}.merge(parameters)) 
+    send_request({:cmd=>'fetch-albums'}.merge(parameters)) 
     albums = []
     1.upto(@last_response['album_count'].to_i) do |i|
       params = @last_response.keys.inject({}) do |hash, value|
@@ -81,6 +82,10 @@ class GalleryRemote
     albums
   end
   
+  def add_item(file_name, album_name, parameters={})
+    send_request({:cmd=>'add-item', :album_name=>album_name}.merge(parameters), file_name) 
+  end
+  
   def status
     "#{@status} - (#{@status_text})"
   end
@@ -92,14 +97,14 @@ class GalleryRemote
   private
   
   def build_multipart_query(params, file_name)
-    params["g2_form[userfile_name]"] = file_name
-    result = params.map{ |k, v| "Content-Disposition: form-data; name=\"#{CGI::escape(k)}\"\r\n\r\n#{v}\r\n" }
+    params["g2_form[userfile_name]"] = file_name  
+    result = params.map{ |k, v| "Content-Disposition: form-data; name=\"#{k}\"\r\n\r\n#{v}\r\n" } #CGI::escape(
     content = open( file_name ) { |f|
       f.read
     }
-    result << "Content-Disposition: form-data; name=\"userfile\"; filename=\"#{file_name}\"\r\n" +
+    result << "Content-Disposition: form-data; name=\"g2_form[userfile]\"; filename=\"#{file_name}\"\r\n" +
       "Content-Transfer-Encoding: binary\r\n" +
-      "Content-Type: #{Web::Mime.get_mime_type(file_name)}\r\n\r\n" + 
+      "Content-Type: #{@@supported_types[File.extname(file_name)]}\r\n\r\n" + 
       content + "\r\n"
     result.collect { |p| "--#{@boundary}\r\n#{p}" }.join("") + "--#{@boundary}--"
   end
@@ -112,46 +117,27 @@ class GalleryRemote
     post_parameters = prep_params(params)
     headers = {}    
     headers["Cookie"] = @cookie_jar.cookies if @cookie_jar.cookies
-    if(file_name)
+    if(file_name && File.file?(file_name))
       query = build_multipart_query(post_parameters, file_name)
-	  headers["Content-type"] = "multipart/form-data, boundary=#{boundary} " if boundary
+	  headers["Content-type"] = "multipart/form-data, boundary=#{@boundary} " if @boundary
     else
       query = build_query(post_parameters)
     end
     res = post(query, headers)
     case res
     when Net::HTTPSuccess, Net::HTTPRedirection
-      read_cookies res.header
-      set_results(read_properties(res.body))
+      handle_response(res)
     else
       res.error!
     end
   end
 
   def post( query, headers={} )
+  	puts headers.inspect
+  	puts query
     Net::HTTP.start(@uri.host, @uri.port) { |h|
       h.post( @uri.path, query, headers )
     }
-  end
-
-  def set_results(result)
-    @auth_token = result['auth_token']
-    @status = result['status']
-    @status_text = result['status_text']
-    result
-  end
-  
-  def read_cookies header
-    @cookie_jar.add(header.get_fields("set-cookie"))
-  end
-
-  def read_properties(lines)
-    result = {}
-    lines.each do |line|
-      name, *values = line.strip.split(/\s*=\s*/)
-      result[name.strip] = values.join "="
-    end
-    result
   end
   
   def prep_params(params)
@@ -162,6 +148,19 @@ class GalleryRemote
     end
     params["g2_authToken"] = @auth_token if @auth_token
     result
+  end
+  
+  def handle_response(res)
+    @cookie_jar.add(res.header.get_fields("set-cookie"))  
+    @last_response = {}
+    res.body.each do |line|
+      name, *values = line.strip.split(/\s*=\s*/)
+      @last_response[name.strip] = values.join "="
+    end
+    @auth_token = @last_response['auth_token']
+    @status = @last_response['status']
+    @status_text = @last_response['status_text']
+    @last_response
   end
 end
 
