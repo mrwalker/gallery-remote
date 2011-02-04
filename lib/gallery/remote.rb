@@ -183,10 +183,16 @@ module Gallery
       end
     end
 
-    def post(query, headers = {})
-      Net::HTTP.start(@uri.host, @uri.port) { |h|
-        h.post( @uri.path, query, headers )
-      }
+    def post(query, headers = {}, retries = 3)
+      begin
+        Net::HTTP.start(@uri.host, @uri.port) do |h|
+          h.post(@uri.path, query, headers)
+        end
+      rescue Exception => e
+        puts "Error during POST (#{retries} retries remain): #{e}"
+        throw e if retries == 0
+        post(query, headers, retries - 1)
+      end
     end
 
     def prep_params(params)
