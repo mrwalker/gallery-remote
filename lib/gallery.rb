@@ -4,5 +4,5 @@ require 'gallery/album'
 require 'gallery/image'
 
 module Gallery
-  VERSION = '0.0.0'
+  VERSION = '0.0.1'
 end
